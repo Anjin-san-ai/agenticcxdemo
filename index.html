@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BT Chatbot Prototype</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* --- 1. CORE STYLES & FONT SETUP --- */
+        :root {
+            --bt-purple: #5500A9;
+            --bt-pink: #E8005A;
+            --bt-light-grey: #f5f5f5;
+            --bt-dark-grey: #333333;
+            --text-color: #1a1a1a;
+            --bg-color: #ffffff;
+            --futuristic-bg: rgba(255, 255, 255, 0.65);
+        }
+
+        body {
+            font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+            margin: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-size: 16px;
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* --- 2. BACKGROUND WEBSITE REPLICA (from screenshot) --- */
+        .page-wrapper {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        .bt-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .bt-header-nav {
+            background-color: var(--bt-purple);
+            color: white;
+        }
+        
+        .bt-header-nav-inner {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .bt-header-nav-inner .nav-links a, .bt-header-nav-inner .user-links a {
+            color: white;
+            text-decoration: none;
+            padding: 8px 12px;
+            font-weight: 500;
+        }
+        
+        .bt-header-nav-inner .nav-links a:first-child {
+            background-color: rgba(255,255,255,0.2);
+            border-radius: 4px;
+        }
+
+        .main-content {
+            padding: 40px 0;
+        }
+
+        .main-content h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--bt-dark-grey);
+            margin-bottom: 5px;
+        }
+
+        .welcome-message {
+            text-align: right;
+            color: #555;
+            margin-bottom: 30px;
+        }
+
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background-color: var(--bt-light-grey);
+            padding: 25px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card h3 {
+            margin-top: 0;
+            font-size: 1.2rem;
+            color: var(--bt-dark-grey);
+        }
+
+        .card p {
+            flex-grow: 1;
+        }
+
+        .card .btn {
+            text-decoration: none;
+            padding: 12px 20px;
+            border-radius: 5px;
+            text-align: center;
+            font-weight: 600;
+            display: inline-block;
+            border: 1px solid var(--bt-purple);
+            transition: all 0.2s ease;
+        }
+
+        .card .btn-primary {
+            background-color: var(--bt-pink);
+            color: white;
+            border-color: var(--bt-pink);
+        }
+        .card .btn-primary:hover {
+            background-color: #d00050;
+        }
+
+        .card .btn-secondary {
+            background-color: transparent;
+            color: var(--bt-purple);
+        }
+        .card .btn-secondary:hover {
+            background-color: rgba(85, 0, 169, 0.05);
+        }
+        
+        .section-title {
+            font-size: 1.8rem;
+            font-weight: 600;
+            color: var(--bt-dark-grey);
+            margin-top: 60px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid var(--bt-purple);
+            padding-bottom: 10px;
+            display: inline-block;
+        }
+        
+        .bordered-card {
+            border: 1px solid #e0e0e0;
+            border-top: 4px solid var(--bt-purple);
+            padding: 25px;
+        }
+
+
+        /* --- 3. CHATBOT LAUNCHER (Floating Action Button) --- */
+        #chat-launcher {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(45deg, var(--bt-purple), #8a2be2);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 28px;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            z-index: 999;
+            transition: transform 0.2s ease-in-out;
+            animation: pulse 2s infinite;
+        }
+
+        #chat-launcher:hover {
+            transform: scale(1.1);
+            animation: none;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(85, 0, 169, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(85, 0, 169, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(85, 0, 169, 0); }
+        }
+
+        /* --- 4. CHAT WINDOW STYLES --- */
+        #chat-container {
+            position: fixed;
+            bottom: 100px;
+            right: 30px;
+            width: 380px;
+            max-height: 70vh;
+            background: var(--futuristic-bg);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.125);
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            z-index: 1000;
+            /* Animation state */
+            opacity: 0;
+            transform: translateY(20px) scale(0.95);
+            transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
+            visibility: hidden;
+        }
+
+        #chat-container.active {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            visibility: visible;
+        }
+        
+        /* Chat Header */
+        .chat-header {
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .chat-header h3 {
+            margin: 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--bt-dark-grey);
+        }
+        
+        .chat-header .close-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+            padding: 0;
+            line-height: 1;
+        }
+
+        /* Chat Log / Messages */
+        #chat-log {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        /* Custom scrollbar for a modern look */
+        #chat-log::-webkit-scrollbar { width: 6px; }
+        #chat-log::-webkit-scrollbar-track { background: transparent; }
+        #chat-log::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+        #chat-log::-webkit-scrollbar-thumb:hover { background: #aaa; }
+
+
+        .chat-message {
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            word-wrap: break-word;
+            opacity: 0;
+            transform: translateY(10px);
+            animation: message-in 0.3s forwards;
+        }
+        
+        @keyframes message-in {
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        .bot-message {
+            background-color: rgba(255, 255, 255, 0.8);
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+        }
+
+        .user-message {
+            background: var(--bt-purple);
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+        
+        /* Quick Reply Buttons */
+        .quick-replies {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 15px;
+        }
+        
+        .quick-reply-btn {
+            background: transparent;
+            border: 1px solid var(--bt-purple);
+            color: var(--bt-purple);
+            padding: 8px 12px;
+            border-radius: 16px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .quick-reply-btn:hover {
+            background: rgba(85, 0, 169, 0.1);
+            transform: translateY(-2px);
+        }
+        
+        /* Typing Indicator */
+        .typing-indicator {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            background-color: rgba(255, 255, 255, 0.8);
+            border-radius: 18px;
+            border-bottom-left-radius: 4px;
+            align-self: flex-start;
+        }
+        
+        .typing-indicator span {
+            height: 8px;
+            width: 8px;
+            margin: 0 2px;
+            background-color: #999;
+            border-radius: 50%;
+            display: inline-block;
+            animation: typing-bounce 1.4s infinite ease-in-out both;
+        }
+        
+        .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+        
+        @keyframes typing-bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1.0); }
+        }
+
+        /* Chat Input Area */
+        .chat-input-area {
+            padding: 15px 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border-top: 1px solid rgba(0, 0, 0, 0.05);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+
+        #chat-input {
+            flex-grow: 1;
+            border: none;
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 20px;
+            padding: 12px 18px;
+            font-family: 'Inter', sans-serif;
+            font-size: 1rem;
+            outline: none;
+            transition: box-shadow 0.2s;
+        }
+        
+        #chat-input:focus {
+            box-shadow: 0 0 0 2px var(--bt-purple);
+        }
+
+        #send-btn {
+            background: var(--bt-purple);
+            border: none;
+            color: white;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 20px;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: background-color 0.2s;
+        }
+
+        #send-btn:hover {
+            background-color: #6a00d1;
+        }
+        
+    </style>
+</head>
+<body>
+
+    <!-- =================================================================== -->
+    <!--  1. MOCKUP OF THE BT WEBSITE BACKGROUND (based on screenshot)     -->
+    <!-- =================================================================== -->
+    <header class="bt-header-nav">
+        <div class="bt-header-nav-inner">
+            <div class="nav-links">
+                <a href="#">My BT</a>
+                <a href="#">Your bills and usage</a>
+                <a href="#">Your products</a>
+                <a href="#">Your details</a>
+            </div>
+            <div class="user-links">
+                <a href="#">Help</a>
+                <a href="#">My BT</a>
+                <a href="#">Email</a>
+            </div>
+        </div>
+    </header>
+    
+    <div class="page-wrapper">
+        <main class="main-content">
+            <div class="welcome-message">Welcome back Indranil</div>
+            <h1>My BT</h1>
+
+            <h2 class="section-title">New for you</h2>
+            <div class="card-grid">
+                <div class="card">
+                    <h3>Exclusive to BT Broadband customers</h3>
+                    <p>Get your hands on the new iPhone 16 with DOUBLE data and 30% off minutes, text and data when you pay for it on Flex Pay.</p>
+                    <a href="#" class="btn btn-secondary">Explore iPhone 16</a>
+                </div>
+                <div class="card">
+                    <h3>Choose how you pay</h3>
+                    <p>You currently pay by cash, cheque or card. Choose a convenient way to pay your future bills.</p>
+                    <a href="#" class="btn btn-primary">Set up now</a>
+                </div>
+                <div class="card">
+                    <h3>Great prizes from the BT family</h3>
+                    <p>Opt in to be front of the queue for BT, EE and Plusnet offers. You could win some top prizes.</p>
+                    <a href="#" class="btn btn-secondary">Sign up and enter</a>
+                </div>
+            </div>
+
+            <h2 class="section-title">Get more from My BT</h2>
+            <div class="card-grid">
+                 <div class="bordered-card">
+                    <h3>Your bills and usage</h3>
+                    <p>Check your latest bill and view your usage.</p>
+                    <a href="#" class="btn btn-secondary">View your bill</a>
+                </div>
+                 <div class="bordered-card">
+                    <h3>Your products</h3>
+                    <p>Make sure you're getting the most from all your products and services.</p>
+                    <a href="#" class="btn btn-secondary">Manage</a>
+                </div>
+                 <div class="bordered-card">
+                    <h3>Your details</h3>
+                    <p>View or change your personal settings, log-in details and more.</p>
+                    <a href="#" class="btn btn-secondary">Manage</a>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- =================================================================== -->
+    <!--  2. CHATBOT PROTOTYPE UI                                            -->
+    <!-- =================================================================== -->
+
+    <!-- Chat Launcher Button -->
+    <div id="chat-launcher" title="Chat with us">
+        <!-- SVG Icon for Chat -->
+        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+        </svg>
+    </div>
+
+    <!-- Chat Window -->
+    <div id="chat-container">
+        <div class="chat-header">
+            <h3>BT Digital Assistant</h3>
+            <button class="close-btn" id="close-chat" title="Close chat">&times;</button>
+        </div>
+        <div id="chat-log">
+            <!-- Messages will be dynamically added here -->
+        </div>
+        <div class="chat-input-area">
+            <input type="text" id="chat-input" placeholder="Type your message...">
+            <button id="send-btn" title="Send message">
+                <!-- SVG Icon for Send -->
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+
+    <!-- =================================================================== -->
+    <!--  3. JAVASCRIPT FOR INTERACTIVITY                                    -->
+    <!-- =================================================================== -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // --- Element Selectors ---
+            const chatLauncher = document.getElementById('chat-launcher');
+            const chatContainer = document.getElementById('chat-container');
+            const closeChatBtn = document.getElementById('close-chat');
+            const chatLog = document.getElementById('chat-log');
+            const chatInput = document.getElementById('chat-input');
+            const sendBtn = document.getElementById('send-btn');
+
+            // --- State ---
+            let isChatOpen = false;
+
+            // --- Functions ---
+            
+            // Toggles the chat window visibility
+            const toggleChat = () => {
+                isChatOpen = !isChatOpen;
+                chatContainer.classList.toggle('active');
+                if (isChatOpen) {
+                    // If opening for the first time, show welcome message
+                    if (chatLog.children.length === 0) {
+                        showWelcomeMessage();
+                    }
+                    chatInput.focus();
+                }
+            };
+            
+            // Adds a message to the chat log
+            const addMessage = (text, sender, hasReplies = false) => {
+                const messageElement = document.createElement('div');
+                messageElement.classList.add('chat-message', `${sender}-message`);
+                
+                let messageHTML = `<p>${text}</p>`;
+
+                if (hasReplies) {
+                    messageHTML += `
+                        <div class="quick-replies">
+                            <button class="quick-reply-btn" data-value="View my bill">View my bill</button>
+                            <button class="quick-reply-btn" data-value="Check my broadband speed">Check broadband speed</button>
+                            <button class="quick-reply-btn" data-value="Track my order">Track my order</button>
+                            <button class="quick-reply-btn" data-value="Speak to an agent">Speak to an agent</button>
+                        </div>
+                    `;
+                }
+                
+                messageElement.innerHTML = messageHTML;
+                chatLog.appendChild(messageElement);
+                scrollToBottom();
+
+                // Add event listeners to newly created quick reply buttons
+                if(hasReplies) {
+                    messageElement.querySelectorAll('.quick-reply-btn').forEach(btn => {
+                        btn.addEventListener('click', () => handleQuickReply(btn));
+                    });
+                }
+            };
+
+            const handleQuickReply = (button) => {
+                const value = button.dataset.value;
+                // Visually disable the buttons after one is clicked
+                button.parentElement.querySelectorAll('.quick-reply-btn').forEach(btn => {
+                    btn.disabled = true;
+                    btn.style.cursor = 'default';
+                    btn.style.opacity = '0.6';
+                });
+                button.style.backgroundColor = 'rgba(85, 0, 169, 0.1)';
+                
+                // Simulate user "sending" the quick reply as a message
+                addMessage(value, 'user');
+                // Trigger bot response
+                simulateBotResponse(value);
+            }
+
+            // Shows the initial welcome message from the bot
+            const showWelcomeMessage = () => {
+                setTimeout(() => {
+                    addMessage("Hi! I'm the BT Digital Assistant. I can help you with common queries. What can I help you with today?", 'bot', true);
+                }, 500);
+            };
+
+            // Shows a typing indicator
+            const showTypingIndicator = () => {
+                const typingElement = document.createElement('div');
+                typingElement.id = 'typing-indicator';
+                typingElement.classList.add('typing-indicator');
+                typingElement.innerHTML = '<span></span><span></span><span></span>';
+                chatLog.appendChild(typingElement);
+                scrollToBottom();
+            };
+
+            // Removes the typing indicator
+            const hideTypingIndicator = () => {
+                const typingElement = document.getElementById('typing-indicator');
+                if (typingElement) {
+                    typingElement.remove();
+                }
+            };
+            
+            // Handles sending a user message
+            const handleSendMessage = () => {
+                const messageText = chatInput.value.trim();
+                if (messageText === '') return;
+
+                addMessage(messageText, 'user');
+                chatInput.value = '';
+                simulateBotResponse(messageText);
+            };
+
+            // Simulates the bot's thinking and response
+            const simulateBotResponse = (userInput) => {
+                showTypingIndicator();
+
+                setTimeout(() => {
+                    hideTypingIndicator();
+                    let botReply = "I'm sorry, I'm not sure how to help with that. You can try asking about your 'bill', 'speed', or 'order'.";
+                    const lowerCaseInput = userInput.toLowerCase();
+
+                    if (lowerCaseInput.includes('bill') || lowerCaseInput.includes('usage')) {
+                        botReply = "You can view your latest bill and check your usage by clicking here: <a href='#' style='color: var(--bt-purple);'>My Bills & Usage</a>. Your current bill is £54.99 and is due on the 25th.";
+                    } else if (lowerCaseInput.includes('speed') || lowerCaseInput.includes('broadband')) {
+                        botReply = "I can run a test on your line. One moment...<br><br>Good news! Your line test shows no issues. Your current download speed is 74Mbps, which is within the expected range for your Fibre 2 package.";
+                    } else if (lowerCaseInput.includes('order') || lowerCaseInput.includes('track')) {
+                        botReply = "Let's see. Your recent order for a new Smart Hub 2 is currently being prepared for dispatch and is expected to arrive in 2-3 working days.";
+                    } else if (lowerCaseInput.includes('agent') || lowerCaseInput.includes('human') || lowerCaseInput.includes('speak')) {
+                        botReply = "Of course. I'm connecting you to a live agent now. Please wait a moment...";
+                    }
+
+                    addMessage(botReply, 'bot');
+                }, 1500); // Simulate 1.5 second delay
+            };
+
+            // Scrolls the chat log to the most recent message
+            const scrollToBottom = () => {
+                chatLog.scrollTop = chatLog.scrollHeight;
+            };
+
+            // --- Event Listeners ---
+            chatLauncher.addEventListener('click', toggleChat);
+            closeChatBtn.addEventListener('click', toggleChat);
+            sendBtn.addEventListener('click', handleSendMessage);
+            chatInput.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    handleSendMessage();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
