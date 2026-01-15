@@ -29,11 +29,21 @@ jobs:
           npm run build --if-present
           npm run test --if-present
 
+      - name: Prepare deployment bundle
+        run: |
+          rm -rf deploy
+          mkdir -p deploy
+          cp -R server deploy/
+          cp -R client deploy/
+          if [ -f .deployment ]; then
+            cp .deployment deploy/.deployment
+          fi
+
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
           name: node-app
-          path: ./server
+          path: ./deploy
 
   deploy:
     runs-on: ubuntu-latest
@@ -46,28 +56,24 @@ jobs:
           name: node-app
           path: ./package
 
-      - name: Prepare server artifact
+      - name: Prepare deployment workspace
         run: |
           set -euo pipefail
-          rm -rf ./server
-          SERVER_PACKAGE="$(find ./package -maxdepth 5 -type f -name package.json | head -n 1 || true)"
-          if [ -z "$SERVER_PACKAGE" ]; then
-            echo "Unable to locate package.json inside downloaded artifact" >&2
-            find ./package -maxdepth 4 -print
-            exit 1
+          rm -rf ./deploy
+          if [ -d "./package/deploy" ]; then
+            mv ./package/deploy ./deploy
+          else
+            mv ./package ./deploy
           fi
-          SERVER_DIR="$(dirname "$SERVER_PACKAGE")"
-          echo "Preparing artifact directory: $SERVER_DIR"
-          mv "$SERVER_DIR" ./server
 
       - name: Debug deploy workspace
         run: |
-          echo "Root:"
-          ls -la
-          echo "Server:"
-          ls -la ./server
-          echo "Server package.json:"
-          ls -la ./server/package.json
+          echo "Deploy root:"
+          ls -la ./deploy
+          echo "Server contents:"
+          ls -la ./deploy/server
+          echo "Client contents:"
+          ls -la ./deploy/client
 
       - name: Deploy to Azure Web App
         id: deploy-to-webapp
@@ -75,5 +81,5 @@ jobs:
         with:
           app-name: 'agentic-cx-demo-1768502151'
           slot-name: 'Production'
-          package: ./server
+          package: ./deploy
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_677DA77ECB2D43448710B1F59B9090DD }}
