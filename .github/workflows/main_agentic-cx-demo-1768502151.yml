@@ -44,7 +44,21 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: node-app
-          path: .
+          path: ./package
+
+      - name: Prepare server artifact
+        run: |
+          set -euo pipefail
+          rm -rf ./server
+          SERVER_PACKAGE="$(find ./package -maxdepth 5 -type f -name package.json | head -n 1 || true)"
+          if [ -z "$SERVER_PACKAGE" ]; then
+            echo "Unable to locate package.json inside downloaded artifact" >&2
+            find ./package -maxdepth 4 -print
+            exit 1
+          fi
+          SERVER_DIR="$(dirname "$SERVER_PACKAGE")"
+          echo "Preparing artifact directory: $SERVER_DIR"
+          mv "$SERVER_DIR" ./server
 
       - name: Debug deploy workspace
         run: |
