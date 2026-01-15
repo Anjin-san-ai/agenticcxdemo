@@ -31,19 +31,21 @@ jobs:
 
       - name: Prepare deployment bundle
         run: |
-          rm -rf deploy
+          set -euo pipefail
+          rm -rf deploy deploy.zip
           mkdir -p deploy
-          cp -R server deploy/
-          cp -R client deploy/
+          cp -R server deploy/server
+          cp -R client deploy/client
           if [ -f .deployment ]; then
             cp .deployment deploy/.deployment
           fi
+          cd deploy && zip -r ../deploy.zip . >/dev/null && cd -
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
           name: node-app
-          path: ./deploy
+          path: ./deploy.zip
 
   deploy:
     runs-on: ubuntu-latest
@@ -59,12 +61,16 @@ jobs:
       - name: Prepare deployment workspace
         run: |
           set -euo pipefail
-          rm -rf ./deploy
-          if [ -d "./package/deploy" ]; then
-            mv ./package/deploy ./deploy
-          else
-            mv ./package ./deploy
+          rm -rf ./deploy ./deploy.zip
+          PACKAGE_FILE="$(find ./package -maxdepth 2 -name 'deploy.zip' | head -n 1 || true)"
+          if [ -z "$PACKAGE_FILE" ]; then
+            echo "deploy.zip not found in artifact" >&2
+            find ./package -maxdepth 3 -print
+            exit 1
           fi
+          mv "$PACKAGE_FILE" ./deploy.zip
+          mkdir -p deploy
+          unzip -q ./deploy.zip -d ./deploy
 
       - name: Debug deploy workspace
         run: |
@@ -81,5 +87,5 @@ jobs:
         with:
           app-name: 'agentic-cx-demo-1768502151'
           slot-name: 'Production'
-          package: ./deploy
+          package: ./deploy.zip
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_677DA77ECB2D43448710B1F59B9090DD }}
