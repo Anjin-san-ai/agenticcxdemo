@@ -516,16 +516,77 @@
 				const processedTraceIds = new Set();
 				let sseReconnectAttempts = 0;
 
-				function initSse(){
-					if (sse) return; // already connected
+				function normalizeAthenaBaseUrl(raw){
+					const trimmed = String(raw || '').trim().replace(/\/+$/, '');
+					if (!trimmed) return trimmed;
+					// Avoid mixed-content failures: if the CX Demo is served over HTTPS but Athena URL is HTTP,
+					// upgrade to HTTPS for non-localhost hosts.
+					try {
+						const parsed = new URL(trimmed);
+						const isLocal = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+						if (window.location.protocol === 'https:' && parsed.protocol === 'http:' && !isLocal) {
+							return `https://${parsed.host}${parsed.pathname.replace(/\/+$/, '')}`;
+						}
+					} catch {
+						// If it's not a full URL, leave as-is.
+					}
+					return trimmed;
+				}
+
+				function bestReplyFromPayload(payload){
+					return (
+						payload?.botReply ||
+						payload?.insights?.LIVE_RESPONSE?.draft ||
+						payload?.insights?.AI_SUMMARY?.summary ||
+						payload?.customer360?.summary ||
+						''
+					);
+				}
+
+				function isTruthyParam(v){
+					return /^(1|true|yes)$/i.test(String(v || '').trim());
+				}
+
+				function getCustAndAthenaFromUrl(){
 					const u = new URL(window.location.href);
 					const DEMO_IDS = ['GB26669607','GB13820473','GB22446688','GB77553311','GB99001234'];
 					let cust = u.searchParams.get('cust');
 					if (!cust || /^rand(om)?$/i.test(cust)) {
 						cust = DEMO_IDS[Math.floor(Math.random()*DEMO_IDS.length)];
 					}
-					const athena = (u.searchParams.get('athena') || 'http://localhost:3001').replace(/\/+$/, '');
-					const url = `${athena}/api/v1/stream/customer-360/${cust}`;
+					const athena = normalizeAthenaBaseUrl(u.searchParams.get('athena') || 'http://localhost:3001');
+					return { u, cust, athena };
+				}
+
+				let didResetForThisPageLoad = false;
+				async function maybeResetAthenaCustomer(){
+					try {
+						const { u, cust, athena } = getCustAndAthenaFromUrl();
+						if (didResetForThisPageLoad) return;
+						if (!isTruthyParam(u.searchParams.get('reset'))) return;
+						didResetForThisPageLoad = true;
+						console.debug('[reset] requesting Athena reset', { cust, athena });
+						await fetch(`${athena}/api/v1/reset-customer`, {
+							method: 'POST',
+							mode: 'cors',
+							headers: { 'Content-Type': 'application/json' },
+							body: JSON.stringify({ customerId: cust })
+						});
+						processedTraceIds.clear();
+						if (sse) {
+							try { sse.close(); } catch(_) {}
+							sse = null;
+						}
+					} catch (e) {
+						console.warn('[reset] failed (continuing anyway)', e);
+					}
+				}
+
+				async function initSse(){
+					if (sse) return; // already connected
+					await maybeResetAthenaCustomer();
+					const { cust, athena } = getCustAndAthenaFromUrl();
+					const url = `${athena}/api/v1/stream/customer-360/${encodeURIComponent(cust)}`;
 					try {
 						console.debug('[SSE] connecting', url);
 						sse = new EventSource(url);
@@ -542,10 +603,13 @@
 								if (traceId) processedTraceIds.add(traceId);
 								return;
 							}
-							// External-chat customer360 update containing a botReply (use as initial agent guidance)
-							if (payload.botReply && payload.traceId && !processedTraceIds.has(payload.traceId)) {
-								addMessage(payload.botReply, 'agent');
-								processedTraceIds.add(payload.traceId);
+							// External-chat customer360 update (prefer botReply, fall back to LIVE_RESPONSE draft)
+							if (payload.traceId && !processedTraceIds.has(payload.traceId)) {
+								const reply = bestReplyFromPayload(payload);
+								if (reply) {
+									addMessage(reply, 'agent');
+									processedTraceIds.add(payload.traceId);
+								}
 							}
 						};
 						sse.onerror = () => {
@@ -663,7 +727,7 @@
 					if (!cust || /^rand(om)?$/i.test(cust)) {
 						cust = DEMO_IDS[Math.floor(Math.random()*DEMO_IDS.length)];
 					}
-					const athena = (u.searchParams.get('athena') || 'http://localhost:3001').replace(/\/+$/, '');
+					const athena = normalizeAthenaBaseUrl(u.searchParams.get('athena') || 'http://localhost:3001');
 					const resp = await fetch('/chat/send', {
 						method: 'POST',
 						headers: { 'Content-Type': 'application/json' },
@@ -682,10 +746,13 @@
 				}
 				if (!data) return;
 				console.debug('Athena payload (immediate render)', data);
-				// Immediate fallback display if server supplies botReply and SSE not yet processed it
-				if (data && data.botReply && data.traceId && !processedTraceIds.has(data.traceId)) {
-					addMessage(data.botReply, 'agent');
-					processedTraceIds.add(data.traceId);
+				// Immediate fallback display if server supplies a reply and SSE not yet processed it
+				if (data && data.traceId && !processedTraceIds.has(data.traceId)) {
+					const reply = bestReplyFromPayload(data);
+					if (reply) {
+						addMessage(reply, 'agent');
+						processedTraceIds.add(data.traceId);
+					}
 				}
 			}
 			// Removed computeReply logic: live agent replies only.
